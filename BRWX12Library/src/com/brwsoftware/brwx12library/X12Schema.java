@@ -19,8 +19,8 @@ public class X12Schema {
 	private HashMap<String, TransactionSet> transactionSetMap;
 	private XMLInputFactory xmlInputFactory;
 
-	public final class DataSegmentMap {
-		public DataSegmentMap(){
+	public final class SegmentMap {
+		public SegmentMap(){
 			itemMap = new HashMap<String, Item>();
 		}
 		
@@ -68,22 +68,23 @@ public class X12Schema {
 	public class Loop {
 		
 		public Loop() {
-			dataSegmentMap = new DataSegmentMap();
+			dataSegmentMap = new SegmentMap();
 			loopArray = new ArrayList<Loop>();
 			attributes = new Attributes();
 		}
 		public Loop(Attributes attributes) {
 			super();
 			this.attributes = attributes;
-			dataSegmentMap = new DataSegmentMap();
+			dataSegmentMap = new SegmentMap();
 			loopArray = new ArrayList<Loop>();
 		}
 		
 		public final class Attributes {
 			private String loopId;
 			private int repetition;
-			private String startDataSegment;
-			private String endDataSegment;
+			private String startSegment;
+			private String endSegment;
+			private String startSegmentData;
 			
 			public String getLoopId() {
 				return loopId;
@@ -97,21 +98,30 @@ public class X12Schema {
 			public void setRepetition(int repetition) {
 				this.repetition = repetition;
 			}
-			public String getStartDataSegment() {
-				return startDataSegment;
+			public String getStartSegment() {
+				return startSegment;
 			}
-			public void setStartDataSegment(String startDataSegment) {
-				this.startDataSegment = startDataSegment;
+			public void setStartSegment(String startSegment) {
+				this.startSegment = startSegment;
 			}
-			public String getEndDataSegment() {
-				return endDataSegment;
+			public String getEndSegment() {
+				return endSegment;
 			}
-			public void setEndDataSegment(String endDataSegment) {
-				this.endDataSegment = endDataSegment;
+			public void setEndSegment(String endSegment) {
+				this.endSegment = endSegment;
+			}
+			public boolean hasStartSegmentData() {
+				return (startSegmentData != null && !startSegmentData.isEmpty());
+			}
+			public String getStartSegmentData() {
+				return startSegmentData;
+			}
+			public void setStartSegmentData(String startSegmentData) {
+				this.startSegmentData = startSegmentData;
 			}
 		}
 		
-		private DataSegmentMap dataSegmentMap;
+		private SegmentMap dataSegmentMap;
 		private	ArrayList<Loop> loopArray;
 		private Attributes attributes;
 
@@ -125,7 +135,7 @@ public class X12Schema {
 		public boolean hasDataSegment(String id) {
 			return dataSegmentMap.has(id);
 		}
-		public DataSegmentMap.Item getDataSegment(String id) {
+		public SegmentMap.Item getDataSegment(String id) {
 			return dataSegmentMap.get(id);
 		}
 		
@@ -139,14 +149,27 @@ public class X12Schema {
 		public int getRepetition() {
 			return attributes.repetition;
 		}
-		boolean isStartingDataSegment(String id) {
-			return (attributes.getStartDataSegment().compareToIgnoreCase(id) == 0);
+		public boolean isStartingSegment(String id, String data) {
+			boolean isStartingSegment = false;
+
+			if (attributes.hasStartSegmentData()) {
+				if (data == null) {
+					isStartingSegment = (attributes.getStartSegment().compareToIgnoreCase(id) == 0);
+				} else {
+					isStartingSegment = ((attributes.getStartSegment().compareToIgnoreCase(id) == 0)
+							&& (attributes.getStartSegmentData().compareToIgnoreCase(data) == 0));
+				}
+
+			} else {
+				isStartingSegment = (attributes.getStartSegment().compareToIgnoreCase(id) == 0);
+			}
+			return isStartingSegment;
 		}
-		boolean hasEndingDataSegment() {
-			return attributes.getEndDataSegment() != null && attributes.getEndDataSegment().length() != 0;
+		public boolean hasEndingSegment() {
+			return attributes.getEndSegment() != null && attributes.getEndSegment().length() != 0;
 		}
-		boolean isEndingDataSegment(String id) {
-			return (attributes.getEndDataSegment().compareToIgnoreCase(id) == 0);
+		public boolean isEndingSegment(String id) {
+			return (attributes.getEndSegment().compareToIgnoreCase(id) == 0);
 		}
 
 		// Child Loops
@@ -169,8 +192,8 @@ public class X12Schema {
 			super();
 
 			Attributes theAttr = new Attributes();
-			theAttr.setStartDataSegment("ST");
-			theAttr.setEndDataSegment("SE");
+			theAttr.setStartSegment("ST");
+			theAttr.setEndSegment("SE");
 			this.setAttributes(theAttr);
 		}
 		
@@ -179,8 +202,8 @@ public class X12Schema {
 			this.id = id;
 
 			Attributes theAttr = new Attributes();
-			theAttr.setStartDataSegment("ST");
-			theAttr.setEndDataSegment("SE");
+			theAttr.setStartSegment("ST");
+			theAttr.setEndSegment("SE");
 			this.setAttributes(theAttr);
 		}
 
@@ -192,12 +215,14 @@ public class X12Schema {
 	}
 	
 	private void addTransactionSet(XMLStreamReader xmlReader) throws X12Exception, XMLStreamException {
-		// Find the TransactionSetID
+		// Find the TransactionSetID and implementation
 		String id = null;
+		String impl = null;
 		for(int i=0; i < xmlReader.getAttributeCount(); i++) {
 			if(xmlReader.getAttributeLocalName(i).compareToIgnoreCase("id") == 0) {
 				id = xmlReader.getAttributeValue(i);
-				break;
+			} else if(xmlReader.getAttributeLocalName(i).compareToIgnoreCase("impl") == 0) {
+				impl = xmlReader.getAttributeValue(i);
 			}
 		}
 		
@@ -206,28 +231,28 @@ public class X12Schema {
 		}
 		
 		//Ensure the current TransactionSet is cleaned up if its being replaced
-		if(hasTransactionSet(id))
+		if(hasTransactionSet(id, impl))
 		{
-			removeTransactionSet(id);
+			removeTransactionSet(id, impl);
 		}
 		
 		//Create the TransactionSet object
 		TransactionSet ts = new TransactionSet(id);
-		transactionSetMap.put(id, ts);		
+		transactionSetMap.put(makeTSID(id, impl), ts);		
 		
 		while(xmlReader.hasNext()) {
 			int eventType = xmlReader.next();
 			if(eventType == XMLStreamConstants.START_ELEMENT) {
 				String name = xmlReader.getLocalName();
 				if(name.compareToIgnoreCase("Segment") == 0) {
-					addDataSegment(ts, xmlReader);
+					addSegment(ts, xmlReader);
 				} else if(name.compareToIgnoreCase("Loop") == 0) {
 					addLoop(ts, xmlReader);
 				}
 			}
 		}
 	}
-	private void addDataSegment(Loop ts, XMLStreamReader xmlReader) throws X12Exception {
+	private void addSegment(Loop ts, XMLStreamReader xmlReader) throws X12Exception {
 		String id = null;
 		int repetition = 1;
 		for(int i=0; i < xmlReader.getAttributeCount(); i++) {
@@ -250,7 +275,7 @@ public class X12Schema {
 		getLoopAttributes(theAttr, xmlReader);
 
 		if(theAttr.getLoopId() == null || theAttr.getLoopId().length() == 0 || 
-				theAttr.getStartDataSegment() == null || theAttr.getStartDataSegment().length() == 0) {		
+				theAttr.getStartSegment() == null || theAttr.getStartSegment().length() == 0) {		
 			throw new X12Exception("Loop attributes not found");
 		}
 
@@ -263,7 +288,7 @@ public class X12Schema {
 			case XMLStreamConstants.START_ELEMENT:
 				String name = xmlReader.getLocalName();
 				if(name.compareToIgnoreCase("Segment") == 0) {
-					addDataSegment(theNewLoop, xmlReader);
+					addSegment(theNewLoop, xmlReader);
 				} else if(name.compareToIgnoreCase("Loop") == 0) {
 					addLoop(theNewLoop, xmlReader);
 				}
@@ -285,24 +310,45 @@ public class X12Schema {
 			} else if(name.compareToIgnoreCase("Repetition") == 0) {
 				theAttr.setRepetition(Integer.parseInt(xmlReader.getAttributeValue(i)));
 			} else if(name.compareToIgnoreCase("StartSegment") == 0) {
-				theAttr.setStartDataSegment(xmlReader.getAttributeValue(i));
+				theAttr.setStartSegment(xmlReader.getAttributeValue(i));
+			} else if(name.compareToIgnoreCase("StartSegmentData") == 0) {
+				theAttr.setStartSegmentData(xmlReader.getAttributeValue(i));
 			} else if(name.compareToIgnoreCase("EndSegment") == 0) {
-				theAttr.setEndDataSegment(xmlReader.getAttributeValue(i));
+				theAttr.setEndSegment(xmlReader.getAttributeValue(i));
 			}
 		}
 	}
+	private String makeTSID(String id, String impl) {
+		String theTSID = null;
+		if(id != null && impl != null && !impl.isEmpty()) {
+			theTSID = String.format("%s/%s", id, impl);
+		}
+		else if(id != null && !id.isEmpty()) {
+			theTSID = id;
+		}
+		return theTSID;
+	}
 	
 	public void removeTransactionSet(String id) {
-		transactionSetMap.remove(id);
+		transactionSetMap.remove(makeTSID(id, null));
+	}
+	public void removeTransactionSet(String id, String impl) {
+		transactionSetMap.remove(makeTSID(id, impl));
 	}
 	public void removeAllTransactionSets() {
 		transactionSetMap.clear();
 	}
 	public boolean hasTransactionSet(String id) {
-		return transactionSetMap.containsKey(id);
+		return transactionSetMap.containsKey(makeTSID(id, null));
+	}
+	public boolean hasTransactionSet(String id, String impl) {
+		return transactionSetMap.containsKey(makeTSID(id, impl));
 	}
 	public TransactionSet getTransactionSet(String id) {
-		return transactionSetMap.get(id);
+		return transactionSetMap.get(makeTSID(id, null));
+	}
+	public TransactionSet getTransactionSet(String id, String impl) {
+		return transactionSetMap.get(makeTSID(id, impl));
 	}
 	public void addTransactionSet(InputStream theStream) throws XMLStreamException, X12Exception {
 		// Ensure the factory
