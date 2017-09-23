@@ -33,98 +33,119 @@ public class X12ConverterXml {
 			public Item() {
 				childLoopCountMap = new HashMap<Integer, Integer>();
 			}
-			
+
 			private Item parent;
 			private X12Schema.Loop loop;
 			private int count;
 			private String hlId;
+			private String parentHlId;
 			private HashMap<Integer, Integer> childLoopCountMap;
-			
+
 			public Item getParentItem() {
 				return parent;
 			}
+
 			public void setParentItem(Item parent) {
 				this.parent = parent;
 			}
+
 			public X12Schema.Loop getLoop() {
 				return loop;
 			}
+
 			public void setLoop(X12Schema.Loop loop) {
 				this.loop = loop;
 			}
+
 			public int getCount() {
 				return count;
 			}
+
 			public int incrementCount() {
 				return count++;
 			}
+
+			@SuppressWarnings("unused")
 			public String getHLID() {
 				return hlId;
 			}
+
 			public boolean hasHLID() {
-				return (hlId != null | hlId.length() != 0) ;
+				return (hlId != null | hlId.length() != 0);
 			}
-			
+
+			public String getParentHLID() {
+				return parentHlId;
+			}
+
 			void setHLID(X12Segment seg) {
-				if(isSegmentHL(seg) && seg.getElementCount() > 1) {
-					hlId = seg.getElement(1);
+				if (isSegmentHL(seg)) {
+					if (seg.getElementCount() > 1) {
+						hlId = seg.getElement(1);
+					}
+
+					if (seg.getElementCount() > 2) {
+						parentHlId = seg.getElement(2);
+					} else {
+						parentHlId = "0";
+					}
 				}
 			}
-			@SuppressWarnings("unused")
-			boolean isEqualParentHLID(X12Segment seg) {
-				if(hasHLID() &&
-						isSegmentHL(seg) &&
-						seg.getElementCount() > 2 &&
-						seg.getElement(2).compareToIgnoreCase(getHLID()) == 0) {
-					return true;
-				}
-				return false;				
-			}
+
 			int getChildLoopCount(int childLoopIndex) {
 				int count = 0;
-				if(childLoopCountMap.containsKey(childLoopIndex)) {
+				if (childLoopCountMap.containsKey(childLoopIndex)) {
 					count = childLoopCountMap.get(childLoopIndex);
 				}
 				return count;
 			}
+
 			void incrementChildLoopCount(int childLoopIndex) {
-				int count = getChildLoopCount(childLoopIndex) + 1;
-				childLoopCountMap.put(childLoopIndex, count);
+				if (childLoopIndex >= 0) {
+					int count = getChildLoopCount(childLoopIndex) + 1;
+					childLoopCountMap.put(childLoopIndex, count);
+				}
 			}
+
 			void resetChildLoopCounters() {
 				childLoopCountMap.clear();
 			}
 		}
-		
+
 		private Deque<Item> stack;
-		
+
 		public boolean isEmpty() {
 			return stack.isEmpty();
 		}
+
 		public void clear() {
 			stack.clear();
 		}
+
 		Item current() {
-			if(stack.isEmpty()) return null;
+			if (stack.isEmpty())
+				return null;
 			return stack.getLast();
 		}
+
 		Item push(X12Schema.Loop loop, X12Segment seg) {
 			Item item = new Item();
 			item.setLoop(loop);
 			item.incrementCount();
-			
-			if(!stack.isEmpty()){
+
+			if (!stack.isEmpty()) {
 				item.setParentItem(current());
 			}
-			
-			if(seg != null && isSegmentHL(seg)) {
+
+			if (seg != null && isSegmentHL(seg)) {
 				item.setHLID(seg);
 			}
-			
+
 			stack.addLast(item);
-						
+
 			return item;
 		}
+
 		Item pop() {
 			return stack.removeLast();
 		}
@@ -137,8 +158,7 @@ public class X12ConverterXml {
 
 		private ArrayList<XMLStreamWriter> stack;
 
-		public int push(XMLStreamWriter writer, String name)
-				throws XMLStreamException {
+		public int push(XMLStreamWriter writer, String name) throws XMLStreamException {
 			stack.add(writer);
 			writer.writeStartElement(name);
 			return stack.size() - 1;
@@ -189,11 +209,11 @@ public class X12ConverterXml {
 	private int positionGS = -1;
 	private int positionST = -1;
 	private int hdrState = HDR_STATE_NONE;
-	//Note: these were used for error info in the original c++ code
+	// Note: these were used for error info in the original c++ code
 	@SuppressWarnings("unused")
 	private int segmentCount = 0;
 	@SuppressWarnings("unused")
-	//End note
+	// End note
 	private String currentSegmentID;
 	private char subElementSeparator;
 	private XMLStreamWriter xmlWriter;
@@ -220,8 +240,7 @@ public class X12ConverterXml {
 	}
 
 	private boolean isSegment(X12Segment theSegment, String seg) {
-		return ((theSegment.getElementCount() > 0) && theSegment.getElement(0)
-				.compareToIgnoreCase(seg) == 0);
+		return ((theSegment.getElementCount() > 0) && theSegment.getElement(0).compareToIgnoreCase(seg) == 0);
 	}
 
 	private boolean isSegmentHL(X12Segment theSegment) {
@@ -253,8 +272,7 @@ public class X12ConverterXml {
 			// Must be GS (start of function group) or IEA (end of ISA) or TA1
 			// Note: If TA1, then it should be the lone record between ISA and
 			// IEA
-			if (isSegment(theSegment, "GS") || isSegment(theSegment, "IEA")
-					|| isSegment(theSegment, "TA1")) {
+			if (isSegment(theSegment, "GS") || isSegment(theSegment, "IEA") || isSegment(theSegment, "TA1")) {
 				bReturn = true;
 			}
 		} else if (hdrState == HDR_STATE_NONE) {
@@ -268,18 +286,21 @@ public class X12ConverterXml {
 		return bReturn;
 	}
 
-	boolean isLoopEnder(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem) {
+	boolean isLoopHL(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
+		return isSegmentHL(theSegment);
+	}
+
+	boolean isLoopEnder(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
+		//Is this segment an ender for the current loop
 		String segID = theSegment.getElement(0);
-		if (loopStackItem.getLoop().hasEndingSegment()
-				&& loopStackItem.getLoop().isEndingSegment(segID)) {
+		if (loopStackItem.getLoop().hasEndingSegment() && loopStackItem.getLoop().isEndingSegment(segID)) {
 			return true;
 		}
 		return false;
 	}
 
-	boolean isLoopMember(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem) {
+	boolean isLoopMember(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
+		//Is this segment a member of the current loop
 		String segID = theSegment.getElement(0);
 		String segData = theSegment.hasElement(1) ? theSegment.getElement(1) : null;
 		if (!loopStackItem.getLoop().isStartingSegment(segID, segData)
@@ -289,69 +310,50 @@ public class X12ConverterXml {
 		return false;
 	}
 
-	boolean isLoopRepeater(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem) {
+	boolean isLoopRepeater(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
+		// Is this segment a starter for the current loop
 		String segID = theSegment.getElement(0);
 		String segData = theSegment.hasElement(1) ? theSegment.getElement(1) : null;
-		if (loopStackItem.getLoop().isStartingSegment(segID, segData)) {
-			if (isSegmentHL(theSegment)) {
-				//I think the very nature of HL segments means they are always child starters
-				return false;
-				//if(loopStackItem.isEqualParentHLID(theSegment))
-				//{
-				//	bReturn = true;
-				//}
-			} else if (loopStackItem.getLoop().getRepetition() == X12Schema.INFINITE_REPEAT
-					|| loopStackItem.getCount() < loopStackItem.getLoop()
-							.getRepetition()) {
-				return true;
-			}
+		if (loopStackItem.getLoop().isStartingSegment(segID, segData)
+				&& (loopStackItem.getLoop().getRepetition() == X12Schema.INFINITE_REPEAT
+						|| loopStackItem.getCount() < loopStackItem.getLoop().getRepetition())) {
+			return true;
 		}
 		return false;
 	}
 
-	boolean isLoopChildStarter(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem) {
-		//Is this segment is a starter for the immediate children
+	boolean isLoopChildStarter(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
+		// Is this segment is a starter for the immediate children
 		return (getChildLoopIndex(theSegment, loopStackItem) != -1);
 	}
 
-	boolean isLoopSiblingStarter(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem) {
+	boolean isLoopSiblingStarter(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
 
 		SchemaLoopStack.Item theParent = loopStackItem.getParentItem();
-		if(theParent == null) return false;
-		
+		if (theParent == null)
+			return false;
+
 		return isLoopChildStarter(theSegment, theParent);
 	}
 
-	boolean isLoopParent(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem) {
+	boolean isLoopParent(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
 		return (searchParentLoops(theSegment, loopStackItem) != 0);
 	}
-	
-	int getChildLoopIndex(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem)
-	{
+
+	int getChildLoopIndex(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
 		int nFound = -1;
 
 		String segID = theSegment.getElement(0);
 		String segData = theSegment.hasElement(1) ? theSegment.getElement(1) : null;
 		int count = loopStackItem.getLoop().getLoopCount();
-		
-		for(int i = 0; i < count; i++)
-		{
+
+		for (int i = 0; i < count; i++) {
 			X12Schema.Loop theChildLoop = loopStackItem.getLoop().getLoopAt(i);
 
-			if(theChildLoop.isStartingSegment(segID, segData))
-			{
+			if (theChildLoop.isStartingSegment(segID, segData)) {
 				int nChildCount = loopStackItem.getChildLoopCount(i);
-				if(nChildCount == 0
-					||
-					theChildLoop.getRepetition() == X12Schema.INFINITE_REPEAT
-					|| 
-					nChildCount < theChildLoop.getRepetition())
-				{
+				if (nChildCount == 0 || theChildLoop.getRepetition() == X12Schema.INFINITE_REPEAT
+						|| nChildCount < theChildLoop.getRepetition()) {
 					nFound = i;
 					break;
 				}
@@ -360,76 +362,65 @@ public class X12ConverterXml {
 
 		return nFound;
 	}
-	
-	int searchParentLoops(X12Segment theSegment,
-			SchemaLoopStack.Item loopStackItem)
-	{
+
+	int searchParentLoops(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) {
 		int nFound = 0;
 		int nCount = 0;
 
 		SchemaLoopStack.Item parent = loopStackItem.getParentItem();
-		while(parent != null && nFound == 0)
-		{
+		while (parent != null && nFound == 0) {
 			nCount++;
 
-			if(isLoopEnder(theSegment, parent)
-				||
-				isLoopRepeater(theSegment, parent)
-				||
-				isLoopChildStarter(theSegment, parent)
-				||
-				isLoopMember(theSegment, parent))
-			{
+			if (isLoopEnder(theSegment, parent) || isLoopRepeater(theSegment, parent)
+					|| isLoopChildStarter(theSegment, parent) || isLoopSiblingStarter(theSegment, parent)
+					|| isLoopMember(theSegment, parent)) {
 				nFound = nCount;
-			}
-			else
-			{
+			} else {
 				parent = parent.getParentItem();
 			}
 		}
 
 		return nFound;
-	}	
-	
-	private void openLoop(X12Segment theSegment,
-			X12Schema.Loop loop) throws XMLStreamException{
-		//Push SchemaLoop onto the stack
+	}
+
+	private void openLoop(X12Segment theSegment, X12Schema.Loop loop) throws XMLStreamException {
+		// Push SchemaLoop onto the stack
 		SchemaLoopStack.Item loopStackItem = schemaLoopStack.push(loop, theSegment);
 
-		//Push XmlNode onto the stack
+		// Push XmlNode onto the stack
 		pushXmlNode("Loop");
-		
+
 		xmlWriter.writeAttribute("id", loopStackItem.getLoop().getLoopID());
 	}
-	
-	private void repeatLoop(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) throws XMLStreamException{
-		//Pop he current XmlNode
-		if(!xmlNodeStack.isEmpty()){
+
+	private void repeatLoop(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) throws XMLStreamException {
+		// Pop he current XmlNode
+		if (!xmlNodeStack.isEmpty()) {
 			popXmlNode();
 		}
-		
-		//Increment loop usage count
+
+		// Increment loop usage count
 		loopStackItem.incrementCount();
-		
-		//Reset child loop counters
+
+		// Reset child loop counters
 		loopStackItem.resetChildLoopCounters();
-		
-		//Push XmlNode onto the stack
+
+		// Push XmlNode onto the stack
 		pushXmlNode("Loop");
-		
+
 		xmlWriter.writeAttribute("id", loopStackItem.getLoop().getLoopID());
 	}
-	
-	private void closeLoop(int count) throws XMLStreamException{
-		for(int i=0; i < count && !xmlNodeStack.isEmpty(); i++){
-			//Pop SchemaLoop from the stack
+
+	private void closeLoop(int count) throws XMLStreamException {
+		for (int i = 0; i < count && !xmlNodeStack.isEmpty(); i++) {
+			// Pop SchemaLoop from the stack
 			schemaLoopStack.pop();
-			
-			//Pop XmlNode from the stack
+
+			// Pop XmlNode from the stack
 			popXmlNode();
 		}
 	}
-	
+
 	private void createSegmentNode(X12Segment theSegment) throws XMLStreamException {
 		String name = theSegment.getElement(0);
 
@@ -451,21 +442,119 @@ public class X12ConverterXml {
 
 	private boolean hasSubElements(X12Segment theSegment, int index) {
 		// Do not consider the ISA element
-		return (!isSegment(theSegment, "ISA") && theSegment.getElement(index).indexOf(subElementSeparator) >= 0);		
+		return (!isSegment(theSegment, "ISA") && theSegment.getElement(index).indexOf(subElementSeparator) >= 0);
 	}
-	
+
 	private void createSubElements(X12Segment theSegment, int index) throws XMLStreamException {
 		String[] subEle = theSegment.getElement(index).split(Character.toString(subElementSeparator));
-		
+
 		for (int i = 0; i < subEle.length; i++) {
-			xmlWriter.writeStartElement(String.format("%S%02d-%02d", theSegment.getElement(0), index, i));
+			xmlWriter.writeStartElement(String.format("%S%02d-%02d", theSegment.getElement(0), index, i + 1));
 			xmlWriter.writeCharacters(subEle[i]);
 			xmlWriter.writeEndElement();
 		}
 	}
+
+	private void createSegmentLoop(X12Segment theSegment, SchemaLoopStack.Item loopStackItem) throws XMLStreamException
+	{
+		int nIndex = getChildLoopIndex(theSegment, loopStackItem);
+		assert(nIndex > -1);
+
+		if(nIndex < 0) return;
+
+		loopStackItem.incrementChildLoopCount(nIndex);
+						
+		openLoop(theSegment, loopStackItem.getLoop().getLoopAt(nIndex));
+
+		createSegmentNode(theSegment);	}
 	
-	private void processSegment(X12Segment theSegment)
-			throws XMLStreamException, X12Exception {
+	private SchemaLoopStack.Item getPrevLoopHL(SchemaLoopStack.Item loopStackItem)
+	{
+		SchemaLoopStack.Item loopHL = null;
+
+		SchemaLoopStack.Item parentItem = loopStackItem.getParentItem();
+		while(parentItem != null && loopHL == null)
+		{
+			if(parentItem.hasHLID())
+			{
+				loopHL = parentItem;
+			}
+			else
+			{
+				parentItem = parentItem.getParentItem();
+			}
+		}
+
+		return loopHL;
+	}
+	
+	private int compareParentHL(X12Segment theSegment, SchemaLoopStack.Item loopStackItem)
+	{
+		assert(isSegmentHL(theSegment));
+		assert(loopStackItem.hasHLID());
+
+		int compareResult = 0;
+		String parentHLID = null;
+
+		if(isSegmentHL(theSegment)
+			&&
+			theSegment.getElementCount() > 2)
+		{
+			parentHLID = theSegment.getElement(2);
+		}
+
+		if(parentHLID != null && !parentHLID.isEmpty())
+		{
+			compareResult = parentHLID.compareToIgnoreCase(loopStackItem.getParentHLID());
+		}
+		
+		return compareResult;
+	}
+
+	private int searchParentLoopsHL(X12Segment theSegment, SchemaLoopStack.Item loopStackItem)
+	{
+		if(!isSegmentHL(theSegment))
+		{
+			assert(false);
+			return 0;
+		}
+
+		int found = 0;
+		int count = 1; //Include current loop
+		String parentHLID = null;
+
+		if(theSegment.getElementCount() > 2)
+		{
+			parentHLID = theSegment.getElement(2);
+		}
+
+		if(parentHLID == null)
+		{
+			return 0;
+		}
+
+		SchemaLoopStack.Item parentItem = loopStackItem.getParentItem();
+		while(parentItem != null && found == 0)
+		{
+			count++;
+
+			if(parentItem.hasHLID() &&
+					parentHLID.compareToIgnoreCase(parentItem.getParentHLID()) == 0)
+				//_stricmp(parentHLID, parentItem.getParentHLID()) == 0)
+				
+			{
+				found = count;
+			}
+			else
+			{
+				parentItem = parentItem.getParentItem();
+			}
+		}
+
+		return found;
+	}
+	
+	private void processSegment(X12Segment theSegment) throws XMLStreamException, X12Exception {
 		segmentCount++;
 		currentSegmentID = theSegment.getElement(0);
 
@@ -505,13 +594,16 @@ public class X12ConverterXml {
 		createSegmentNode(theSegment);
 	}
 
-	private void processSegmentST(X12Segment theSegment) throws X12Exception,
-			XMLStreamException {
+	private void processSegmentST(X12Segment theSegment) throws X12Exception, XMLStreamException {
 		if (theSegment.getElementCount() < 2) {
 			throw new X12Exception("Unexpected ST segment state");
 		}
 
 		hdrState |= HDR_STATE_ST;
+
+		// Initial these transaction set dependent objects
+		schemaLoopStack.clear();
+		x12SchemaTS = null;
 
 		// Save the ST position
 		positionST = pushXmlNode("TransactionSet");
@@ -523,8 +615,8 @@ public class X12ConverterXml {
 		// Write the ST node
 		createSegmentNode(theSegment);
 
-		 // If we have a schema retrieve the TransactionSet schema and push it on
-		 // the schema stack
+		// If we have a schema retrieve the TransactionSet schema and push it on
+		// the schema stack
 		if (x12Schema != null) {
 			boolean found = false;
 
@@ -553,8 +645,8 @@ public class X12ConverterXml {
 
 			}
 
-			//If not found try a more general version
-			if(!found && x12Schema.hasTransactionSet(tsID)) {
+			// If not found try a more general version
+			if (!found && x12Schema.hasTransactionSet(tsID)) {
 				x12SchemaTS = x12Schema.getTransactionSet(tsID);
 				schemaLoopStack.push(x12SchemaTS, null);
 			}
@@ -609,59 +701,74 @@ public class X12ConverterXml {
 		}
 	}
 
-	private void processSegmentLoop(X12Segment theSegment) throws XMLStreamException{
+	private void processSegmentLoop(X12Segment theSegment) throws XMLStreamException {
 		boolean bProcess = true;
-		while(bProcess)
-		{
+		while (bProcess) {
 			bProcess = false;
 			SchemaLoopStack.Item loopStackItem = schemaLoopStack.current();
 
-			if(isLoopRepeater(theSegment, loopStackItem))
-			{
+			if (isLoopHL(theSegment, loopStackItem)) {
+				SchemaLoopStack.Item prevLoopHL = getPrevLoopHL(loopStackItem);
+
+				int nCloseCount = 0;
+
+				if (prevLoopHL != null) {
+					int nCompare = compareParentHL(theSegment, prevLoopHL);
+
+					if (nCompare == 0) {
+						// Same ParentHL
+						nCloseCount = searchParentLoopsHL(theSegment, loopStackItem);
+					} else if (nCompare > 0) {
+						// New Child HL
+						nCloseCount = searchParentLoops(theSegment, loopStackItem);
+					} else {
+						// Search for Sibling Parent HL
+						nCloseCount = searchParentLoopsHL(theSegment, loopStackItem);
+					}
+				} else {
+					nCloseCount = searchParentLoops(theSegment, loopStackItem);
+				}
+
+				// Close loops
+				closeLoop(nCloseCount);
+
+				// Reset current LoppStackItem
+				loopStackItem = schemaLoopStack.current();
+
+				// Create the HL segment loop
+				if (getChildLoopIndex(theSegment, loopStackItem) != -1) {
+					createSegmentLoop(theSegment, loopStackItem);
+				}
+			} else if (isLoopRepeater(theSegment, loopStackItem)) {				
 				repeatLoop(theSegment, loopStackItem);
 				createSegmentNode(theSegment);
-			}
-			else if(isLoopChildStarter(theSegment, loopStackItem))
-			{
-				int nIndex = getChildLoopIndex(theSegment, loopStackItem);
-				assert (nIndex > -1);
-				loopStackItem.incrementChildLoopCount(nIndex);
-				openLoop(theSegment, loopStackItem.getLoop().getLoopAt(nIndex));
-				createSegmentNode(theSegment);
-			}
-			else if(isLoopEnder(theSegment, loopStackItem))
-			{
-				if(isLoopMember(theSegment, loopStackItem))
-				{
+			} else if (isLoopChildStarter(theSegment, loopStackItem)) {
+				createSegmentLoop(theSegment, loopStackItem);
+			} else if (isLoopEnder(theSegment, loopStackItem)) {
+				if (isLoopMember(theSegment, loopStackItem)) {
 					createSegmentNode(theSegment);
 				}
 				closeLoop(1);
-			}
-			else if(isLoopSiblingStarter(theSegment, loopStackItem))
-			{
-				closeLoop(searchParentLoops(theSegment, loopStackItem));
-				
-				//Process this segment again within the parent loop
-				bProcess = true;
-			}
-			else if(isLoopMember(theSegment, loopStackItem))
-			{
-				createSegmentNode(theSegment);
-			}
-			else if(isLoopParent(theSegment, loopStackItem))
-			{
+			} else if (isLoopSiblingStarter(theSegment, loopStackItem)) {
 				closeLoop(searchParentLoops(theSegment, loopStackItem));
 
-				//Process this segment again within the parent loop
+				// Process this segment again within the parent loop
+				bProcess = true;
+			} else if (isLoopMember(theSegment, loopStackItem)) {
+				createSegmentNode(theSegment);
+			} else if (isLoopParent(theSegment, loopStackItem)) {
+				closeLoop(searchParentLoops(theSegment, loopStackItem));
+
+				// Process this segment again within the parent loop
 				bProcess = true;
 			}
 		}
 	}
-	
+
 	public void convert(InputStream input, OutputStream output) throws XMLStreamException, IOException, X12Exception {
 		convert(input, output, null);
 	}
-	
+
 	public void convert(InputStream input, OutputStream output, X12Schema x12Schema)
 			throws XMLStreamException, IOException, X12Exception {
 		// Ensure the factory
@@ -671,7 +778,7 @@ public class X12ConverterXml {
 
 		// Initialize
 		initializeState();
-		
+
 		// Cache values
 		this.x12Schema = x12Schema;
 
@@ -686,10 +793,10 @@ public class X12ConverterXml {
 
 		// Cache the SubElementSeparator
 		subElementSeparator = theISA.getComponementSeparator();
-		
+
 		// Convert the ISA structure to a segment
-		X12Segment theSegment = new X12Segment(theISA.toString().toCharArray(),
-				theISA.getElementSeparator(), theISA.getSegmentSeparator());
+		X12Segment theSegment = new X12Segment(theISA.toString().toCharArray(), theISA.getElementSeparator(),
+				theISA.getSegmentSeparator());
 
 		if (!isExpectedSegment(theSegment)) {
 			throw new X12Exception("Unexpected X12 segment - not ISA");
