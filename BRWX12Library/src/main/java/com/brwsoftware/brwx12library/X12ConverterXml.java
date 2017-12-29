@@ -71,7 +71,7 @@ public class X12ConverterXml {
 			}
 
 			public boolean hasHLID() {
-				return (hlId != null | hlId.length() != 0);
+				return (hlId != null && hlId.length() != 0);
 			}
 
 			public String getParentHLID() {
