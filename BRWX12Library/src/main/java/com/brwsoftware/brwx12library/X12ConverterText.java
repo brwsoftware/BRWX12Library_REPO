@@ -13,8 +13,6 @@ public class X12ConverterText {
 	}
 	
 	public void convert(InputStream input, OutputStream output) throws IOException, X12Exception {
-		//System.getProperty("line.separator")
-		//System.lineSeparator()
 		convert(input, output, System.getProperty("line.separator"));
 	}
 
