@@ -52,6 +52,7 @@ public class X12Reader {
 			count = pos;
 		}
 	}
+	
 	public X12Reader(InputStream theStream) {
 		bufReader = new BufferedReader(new InputStreamReader(theStream));
 	}

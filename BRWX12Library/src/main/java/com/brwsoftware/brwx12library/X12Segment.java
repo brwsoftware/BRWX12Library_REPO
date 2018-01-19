@@ -31,7 +31,6 @@ public final class X12Segment {
 		}
 	}
 	
-
 	public String toString() {
 		return new String(data);
 	}
