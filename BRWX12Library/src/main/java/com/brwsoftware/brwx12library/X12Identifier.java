@@ -5,10 +5,10 @@ import java.io.InputStream;
 
 public class X12Identifier {
 
-	public static class TransactionSet {
-		
+	public static class TransactionSet {		
 		private String tsID;
 		private String tsImpl;
+		
 		public TransactionSet() {
 			
 		}
@@ -24,9 +24,9 @@ public class X12Identifier {
 		private boolean isX12 = false;
 		private final TransactionSet transactionSet = new TransactionSet();
 		
-		public Attributes() {
-			
+		public Attributes() {			
 		}
+		
 		public boolean isX12() {
 			return isX12;
 		}
@@ -40,6 +40,10 @@ public class X12Identifier {
 	}
 
 	public static Attributes getAttributes(InputStream theStream) throws IOException, X12Exception {
+		//Note: There are scenarios where an X12 file will contain multiple transaction sets.
+		//This method makes the assumption all transaction sets within the ISA will be same.
+		//Therefore we stop after the first transaction set.
+		
 		Attributes theAttributes = new Attributes();
 		
 		X12Reader theReader = new X12Reader(theStream);
